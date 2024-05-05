@@ -1,5 +1,17 @@
-{ cargo, fetchFromGitHub, makeWrapper, pkg-config, rustPlatform, lib, stdenv
-, gcc, cmake, libiconv, CoreServices, Security }:
+{ lib
+, CoreServices
+, Security
+, cargo
+, cmake
+, fetchFromGitHub
+, gcc
+, libiconv
+, makeWrapper
+, pkg-config
+, rustPlatform
+, rustc
+, stdenv
+}:
 
 rustPlatform.buildRustPackage rec {
   pname = "evcxr";
@@ -17,8 +29,8 @@ rustPlatform.buildRustPackage rec {
   RUST_SRC_PATH = "${rustPlatform.rustLibSrc}";
 
   nativeBuildInputs = [ pkg-config makeWrapper cmake ];
-  buildInputs = lib.optionals stdenv.isDarwin
-    [ libiconv CoreServices Security ];
+  buildInputs = [ rustc ]
+    ++ lib.optionals stdenv.isDarwin [ libiconv CoreServices Security ];
 
   checkFlags = [
     # test broken with rust 1.69:
@@ -27,17 +39,19 @@ rustPlatform.buildRustPackage rec {
     "--skip=check_for_errors"
   ];
 
-  postInstall = let
-    wrap = exe: ''
-      wrapProgram $out/bin/${exe} \
-        --prefix PATH : ${lib.makeBinPath [ cargo gcc ]} \
-        --set-default RUST_SRC_PATH "$RUST_SRC_PATH"
+  postInstall =
+    let
+      wrap = exe: ''
+        wrapProgram $out/bin/${exe} \
+          --prefix PATH : ${lib.makeBinPath [ cargo gcc ]} \
+          --set-default RUST_SRC_PATH "$RUST_SRC_PATH"
+      '';
+    in
+    ''
+      ${wrap "evcxr"}
+      ${wrap "evcxr_jupyter"}
+      rm $out/bin/testing_runtime
     '';
-  in ''
-    ${wrap "evcxr"}
-    ${wrap "evcxr_jupyter"}
-    rm $out/bin/testing_runtime
-  '';
 
   meta = with lib; {
     description = "An evaluation context for Rust";
